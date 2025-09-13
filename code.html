@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>False Fact Detector</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Typewriter Animation Library -->
+    <script src="https://unpkg.com/typeit@8.7.1/dist/index.umd.js"></script>
+    <style>
+        :root {
+            --primary-green: #10b981;
+            --dark-bg: #0a0c10; /* A deeper, richer black */
+        }
+
+        /* Custom Cursor Designs */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--dark-bg);
+            background-image:
+                linear-gradient(rgba(16, 185, 129, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(16, 185, 129, 0.05) 1px, transparent 1px);
+            background-size: 35px 35px;
+            position: relative;
+            /* Custom futuristic reticle cursor */
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(16, 185, 129, 0.9)" stroke-width="1.5"><circle cx="12" cy="12" r="3"></circle><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line></svg>') 16 16, auto;
+        }
+        
+        button, a, textarea, input {
+            /* "Target locked" version of the cursor */
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="rgba(16, 185, 129, 0.2)" stroke="rgba(16, 185, 129, 0.95)" stroke-width="1.5"><circle cx="12" cy="12" r="3"></circle><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line></svg>') 16 16, pointer;
+        }
+
+        .title-font {
+            font-family: 'Chakra Petch', sans-serif;
+        }
+
+        #background-text {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -10;
+            overflow: hidden;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        #background-text span {
+            position: absolute;
+            color: rgba(16, 185, 129, 0.03);
+            font-size: 10vw;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(800px circle at var(--x) var(--y), rgba(22, 163, 74, 0.15), transparent 40%);
+            will-change: transform;
+            z-index: -1;
+            animation: moveAurora 20s linear infinite alternate;
+        }
+
+        /* New Parabola Glow element */
+        #parabola-glow {
+            position: fixed;
+            bottom: -50vh;
+            left: 50%;
+            width: 200vw;
+            height: 100vh;
+            background: radial-gradient(ellipse at bottom, rgba(16, 185, 129, 0.15) 0%, transparent 70%);
+            transform: translateX(-50%);
+            z-index: -5;
+            pointer-events: none;
+            animation: pulseParabola 10s ease-in-out infinite;
+        }
+
+        @keyframes pulseParabola {
+            0%, 100% {
+                opacity: 0.7;
+                transform: translateX(-50%) scale(0.95);
+            }
+            50% {
+                opacity: 1;
+                transform: translateX(-50%) scale(1);
+            }
+        }
+
+
+        @keyframes moveAurora {
+            0% { transform: translate(-20%, -20%); }
+            100% { transform: translate(20%, 20%); }
+        }
+
+        .header-glow {
+            text-shadow: 0 0 15px rgba(16, 185, 129, 1), 0 0 25px rgba(16, 185, 129, 0.7);
+        }
+
+        .btn-glow {
+            box-shadow: 0 0 15px rgba(22, 163, 74, 0.5);
+            transition: all 0.3s ease-in-out;
+        }
+        .btn-glow:hover {
+            box-shadow: 0 0 35px rgba(22, 163, 74, 0.9);
+            transform: translateY(-3px) scale(1.02);
+        }
+        .btn-glow:active {
+            transform: translateY(1px) scale(1);
+        }
+        
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: var(--primary-green);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .result-card, .modal-card {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        textarea:focus {
+            border-color: var(--primary-green) !important;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.4), inset 0 0 10px rgba(16, 185, 129, 0.1) !important;
+        }
+
+        #side-menu {
+            transition: transform 0.3s ease-in-out;
+        }
+
+        @keyframes stamp {
+            0% { transform: scale(1.5) rotate(-15deg); opacity: 0; }
+            50% { transform: scale(1) rotate(5deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        .stamp-animation { animation: stamp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+        @keyframes lightbulb-glow {
+            0%, 100% { filter: drop-shadow(0 0 5px #fef08a) drop-shadow(0 0 15px #fef08a); }
+            50% { filter: drop-shadow(0 0 10px #fde047) drop-shadow(0 0 25px #fde047); }
+        }
+        .lightbulb-animation { animation: lightbulb-glow 2s ease-in-out infinite; }
+        
+        @keyframes scan {
+            0%, 100% { transform: translateX(-10%) rotate(-15deg); }
+            50% { transform: translateX(10%) rotate(15deg); }
+        }
+        .scan-animation { animation: scan 2.5s ease-in-out infinite; }
+        
+        .ti-cursor {
+            display: none;
+        }
+        
+        .comment-section {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-in-out;
+        }
+
+    </style>
+</head>
+<body class="text-gray-300 p-4 pt-24 pb-12">
+    
+    <!-- Parabola Glow -->
+    <div id="parabola-glow"></div>
+
+    <!-- Faded Background Text -->
+    <div id="background-text">
+        <span style="top: 10%; left: 5%; transform: rotate(-15deg);">?</span>
+        <span style="top: 20%; left: 70%; transform: rotate(10deg); font-size: 8vw;">📖</span>
+        <span style="top: 80%; left: 85%; transform: rotate(5deg);">?</span>
+        <span style="top: 60%; left: 10%; transform: rotate(-5deg); font-size: 8vw;">Article 14</span>
+        <span style="top: 40%; left: 40%; transform: rotate(20deg);">?</span>
+        <span style="top: 85%; left: 30%; transform: rotate(-10deg); font-size: 5vw;">Justice & Liberty</span>
+    </div>
+
+    <!-- Menu Button -->
+    <button id="menu-btn" class="fixed top-4 left-4 z-50 p-2 rounded-md bg-gray-900/50 backdrop-blur-sm border border-gray-700 hover:bg-gray-800 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
+        </svg>
+    </button>
+
+    <!-- Menu Overlay -->
+    <div id="menu-overlay" class="fixed inset-0 bg-black/60 z-30 hidden"></div>
+
+    <!-- Side Menu -->
+    <div id="side-menu" class="fixed top-0 left-0 w-64 h-full bg-gray-900/95 backdrop-blur-sm shadow-2xl z-40 transform -translate-x-full border-r border-gray-700">
+        <div class="p-5 flex flex-col h-full">
+            <div class="flex items-center justify-between mb-8">
+                <h2 class="text-2xl text-white header-glow title-font">Menu</h2>
+                <button id="close-btn" class="p-1 rounded-full hover:bg-gray-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <nav class="title-font text-lg">
+                <a href="#" class="block py-2.5 px-4 rounded transition duration-200 hover:bg-green-600 hover:text-white">Home</a>
+                <a href="#" id="our-team-link" class="block py-2.5 px-4 rounded transition duration-200 hover:bg-green-600 hover:text-white">Our Team</a>
+                <a href="#" id="sources-link" class="block py-2.5 px-4 rounded transition duration-200 hover:bg-green-600 hover:text-white">Verified Sources</a>
+                <a href="#" id="browse-link" class="block py-2.5 px-4 rounded transition duration-200 hover:bg-green-600 hover:text-white">Browse</a>
+                <a href="#" id="community-link" class="block py-2.5 px-4 rounded transition duration-200 hover:bg-green-600 hover:text-white">Community</a>
+            </nav>
+            <div class="mt-auto text-center text-xs text-gray-500">
+                <p>&copy; 2025 False Fact Detector</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- "Our Team" Modal -->
+    <div id="team-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden">
+        <div class="modal-card w-full max-w-4xl bg-gray-900/80 border border-gray-700 rounded-xl shadow-2xl shadow-green-900/30 max-h-[90vh] overflow-y-auto">
+            <div class="p-6 md:p-8">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 id="team-title" class="text-4xl text-white header-glow title-font"></h2>
+                    <button id="close-team-modal-btn" class="p-2 rounded-full hover:bg-gray-700 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Team Member Card -->
+                    <div class="bg-gray-800/50 p-5 rounded-lg text-center border border-gray-700 hover:border-green-500 hover:scale-105 transition-all duration-300">
+                        <img src="https://placehold.co/100x100/0a0c10/10b981?text=AA" alt="Ashish Agrawal" class="w-24 h-24 rounded-full mx-auto mb-4 border-2 border-green-500">
+                        <h3 class="font-bold text-xl text-white title-font">Ashish Agrawal</h3>
+                        <p class="text-green-400 text-sm mb-3">Project Lead & Backend Dev</p>
+                    </div>
+                    <div class="bg-gray-800/50 p-5 rounded-lg text-center border border-gray-700 hover:border-green-500 hover:scale-105 transition-all duration-300">
+                        <img src="https://placehold.co/100x100/0a0c10/10b981?text=KS" alt="Krishnanshu Singh" class="w-24 h-24 rounded-full mx-auto mb-4 border-2 border-green-500">
+                        <h3 class="font-bold text-xl text-white title-font">Krishnanshu Singh</h3>
+                        <p class="text-green-400 text-sm mb-3">Frontend & UI/UX Design</p>
+                    </div>
+                    <div class="bg-gray-800/50 p-5 rounded-lg text-center border border-gray-700 hover:border-green-500 hover:scale-105 transition-all duration-300">
+                        <img src="https://placehold.co/100x100/0a0c10/10b981?text=PP" alt="Prakriti Pankaj" class="w-24 h-24 rounded-full mx-auto mb-4 border-2 border-green-500">
+                        <h3 class="font-bold text-xl text-white title-font">Prakriti Pankaj</h3>
+                        <p class="text-green-400 text-sm mb-3">DevOps & Testing</p>
+                    </div>
+                    <div class="bg-gray-800/50 p-5 rounded-lg text-center border border-gray-700 hover:border-green-500 hover:scale-105 transition-all duration-300">
+                        <img src="https://placehold.co/100x100/0a0c10/10b981?text=RJ" alt="Rohan Jangid" class="w-24 h-24 rounded-full mx-auto mb-4 border-2 border-green-500">
+                        <h3 class="font-bold text-xl text-white title-font">Rohan Jangid</h3>
+                        <p class="text-green-400 text-sm mb-3">API & Research</p>
+                    </div>
+                    <div class="bg-gray-800/50 p-5 rounded-lg text-center border border-gray-700 hover:border-green-500 hover:scale-105 transition-all duration-300">
+                        <img src="https://placehold.co/100x100/0a0c10/10b981?text=AG" alt="Akshat Goyal" class="w-24 h-24 rounded-full mx-auto mb-4 border-2 border-green-500">
+                        <h3 class="font-bold text-xl text-white title-font">Akshat Goyal</h3>
+                        <p class="text-green-400 text-sm mb-3">Documentation & Presentation</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- "Verified Sources" Modal -->
+    <div id="sources-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden">
+        <div class="modal-card w-full max-w-4xl bg-gray-900/80 border border-gray-700 rounded-xl shadow-2xl shadow-green-900/30 max-h-[90vh] overflow-y-auto">
+            <div class="p-6 md:p-8">
+                 <div class="flex items-center justify-between mb-6">
+                    <h2 id="sources-title" class="text-4xl text-white header-glow title-font"></h2>
+                    <button id="close-sources-modal-btn" class="p-2 rounded-full hover:bg-gray-700 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                 <p class="text-gray-400 mb-6">For this demonstration, the application simulates API calls to the following authoritative sources to provide verdicts:</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Browse News Modal -->
+    <div id="browse-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden">
+        <div class="modal-card w-full max-w-4xl bg-gray-900/80 border border-gray-700 rounded-xl shadow-2xl shadow-green-900/30 max-h-[90vh] overflow-y-auto">
+            <div class="p-6 md:p-8">
+                 <div class="flex items-center justify-between mb-6">
+                    <h2 id="browse-title" class="text-4xl text-white header-glow title-font"></h2>
+                    <button id="close-browse-modal-btn" class="p-2 rounded-full hover:bg-gray-700 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="text-gray-400 mb-6" id="browse-timestamp"></p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 class="text-2xl text-green-400 title-font mb-4 border-b-2 border-green-700 pb-2">Global Headlines</h3>
+                        <div class="space-y-3">
+                            <a href="https://www.un.org/en/climatechange/cop29" target="_blank" rel="noopener noreferrer" class="block p-3 rounded-lg hover:bg-gray-800/50 transition-colors">
+                                <p class="font-semibold text-white">UN Climate Summit reaches critical agreement on carbon capture technologies.</p>
+                                <p class="text-xs text-gray-500">REUTERS - 2 hours ago</p>
+                            </a>
+                             <a href="https://www.federalreserve.gov/newsevents/pressreleases/monetary20250912a.htm" target="_blank" rel="noopener noreferrer" class="block p-3 rounded-lg hover:bg-gray-800/50 transition-colors">
+                                <p class="font-semibold text-white">Global markets react to US Federal Reserve's latest interest rate decision.</p>
+                                <p class="text-xs text-gray-500">BLOOMBERG - 4 hours ago</p>
+                            </a>
+                            <a href="https://www.nasa.gov/news/artemis-iii-crew-completes-final-training-simulations/" target="_blank" rel="noopener noreferrer" class="block p-3 rounded-lg hover:bg-gray-800/50 transition-colors">
+                                <p class="font-semibold text-white">NASA's Artemis III mission crew completes final training simulations for lunar landing.</p>
+                                <p class="text-xs text-gray-500">NASA PRESS RELEASE - 8 hours ago</p>
+                            </a>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-2xl text-green-400 title-font mb-4 border-b-2 border-green-700 pb-2">Indian Headlines</h3>
+                         <div class="space-y-3">
+                             <a href="https://timesofindia.indiatimes.com/business/india-business/government-announces-new-digital-infrastructure-scheme/articleshow/1234567.cms" target="_blank" rel="noopener noreferrer" class="block p-3 rounded-lg hover:bg-gray-800/50 transition-colors">
+                                <p class="font-semibold text-white">Indian Government announces new 'Digital Infrastructure' scheme under the PIB.</p>
+                                <p class="text-xs text-gray-500">THE TIMES OF INDIA - 1 hour ago</p>
+                            </a>
+                             <a href="https://pib.gov.in/PressReleasePage.aspx?PRID=2054669" target="_blank" rel="noopener noreferrer" class="block p-3 rounded-lg hover:bg-gray-800/50 transition-colors">
+                                <p class="font-semibold text-white">ISRO confirms successful launch of next-generation communication satellite 'Sanchaar-2B'.</p>
+                                <p class="text-xs text-gray-500">PIB - 3 hours ago</p>
+                            </a>
+                             <a href="https://www.thehindu.com/business/rbi-holds-key-interest-rates-steady-citing-stable-inflation-outlook/article1234567.ece" target="_blank" rel="noopener noreferrer" class="block p-3 rounded-lg hover:bg-gray-800/50 transition-colors">
+                                <p class="font-semibold text-white">RBI holds key interest rates steady, citing stable inflation outlook.</p>
+                                <p class="text-xs text-gray-500">THE HINDU - 6 hours ago</p>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Community Modal -->
+    <div id="community-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden">
+        <div class="modal-card w-full max-w-4xl bg-gray-900/80 border border-gray-700 rounded-xl shadow-2xl shadow-green-900/30 max-h-[90vh] flex flex-col">
+            <div class="p-6 md:p-8 border-b border-gray-700">
+                 <div class="flex items-center justify-between mb-4">
+                    <h2 id="community-title" class="text-4xl text-white header-glow title-font"></h2>
+                    <button id="close-community-modal-btn" class="p-2 rounded-full hover:bg-gray-700 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="bg-gray-800/50 p-4 rounded-lg">
+                    <textarea id="post-input" rows="2" class="w-full p-2 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-0" placeholder="Share a fact or ask a question..."></textarea>
+                    <button id="post-btn" class="w-full mt-2 bg-green-600 text-white font-bold py-2 px-4 rounded-lg btn-glow title-font text-lg">Post to Feed</button>
+                </div>
+            </div>
+            <div id="post-feed" class="p-6 md:p-8 flex-grow overflow-y-auto">
+                <!-- Posts will be injected here -->
+            </div>
+        </div>
+    </div>
+
+
+    <div class="w-full max-w-3xl mx-auto p-4">
+        <header class="text-center mb-10">
+            <h1 id="main-title" class="text-5xl md:text-7xl font-bold text-white mb-2 title-font header-glow"></h1>
+            <p id="sub-title" class="text-lg md:text-xl text-gray-400"></p>
+        </header>
+
+        <main class="bg-gray-900/50 backdrop-blur-md border border-gray-700 rounded-xl shadow-2xl shadow-green-900/20 p-6 md:p-8">
+            <div class="mb-4">
+                <label for="claim-input" class="block mb-2 text-lg font-medium text-green-400 title-font">Enter a statement to verify:</label>
+                <textarea id="claim-input" rows="3" class="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-lg text-gray-200 focus:outline-none focus:ring-0 transition-all duration-300" placeholder="e.g., The Great Wall of China is visible from space..."></textarea>
+            </div>
+            <button id="verify-btn" class="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg text-xl hover:bg-green-500 transition-colors btn-glow title-font">
+                Verify
+            </button>
+        </main>
+
+        <div id="result-container" class="mt-8">
+            <!-- Results will be injected here by JavaScript -->
+        </div>
+    </div>
+    
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, doc, updateDoc, increment, query, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Your web app's Firebase configuration - YEH AAPKE UNIQUE KEYS HAIN
+        // NOTE: Community feature ke liye, Firebase project mein "Authentication" -> "Sign-in method" -> "Anonymous" ko ENABLE karna zaroori hai.
+        const firebaseConfig = {
+            apiKey: "AIzaSyAPgRTwzP-UW6KIUsrV9tuiBrTRRkQSMxE",
+            authDomain: "falsefactdetector.firebaseapp.com",
+            projectId: "falsefactdetector",
+            storageBucket: "falsefactdetector.firebasestorage.app",
+            messagingSenderId: "292254836936",
+            appId: "1:292254836936:web:e596f71975c80697005dfd",
+            measurementId: "G-0STWWXP66H"
+        };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'falsefactdetector';
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- Firebase Authentication ---
+        async function setupAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                console.log("Firebase Auth Ready. User UID:", auth.currentUser.uid);
+                setupRealtimeFeed(); // Setup listener after auth is ready
+            } catch(error) {
+                console.error("Firebase Authentication Error:", error);
+                 document.getElementById('post-feed').innerHTML = '<p class="text-center text-red-400">Error connecting to community database. Please check your Firebase setup and security rules.</p>';
+            }
+        }
+
+        // --- Community Feed Logic ---
+        const communityLink = document.getElementById('community-link');
+        const communityModal = document.getElementById('community-modal');
+        const closeCommunityModalBtn = document.getElementById('close-community-modal-btn');
+        const postInput = document.getElementById('post-input');
+        const postBtn = document.getElementById('post-btn');
+        const postFeed = document.getElementById('post-feed');
+        let communityTitleTyped;
+
+        const postsCollectionRef = collection(db, `artifacts/${appId}/public/data/community_posts`);
+
+        function toggleCommunityModal() {
+            communityModal.classList.toggle('hidden');
+            if (!communityModal.classList.contains('hidden') && !communityTitleTyped) {
+                communityTitleTyped = new TypeIt('#community-title', { strings: "Community Feed", speed: 50, cursor: false }).go();
+            } else if (communityTitleTyped) {
+                communityTitleTyped.reset(); communityTitleTyped = null;
+            }
+        }
+
+        communityLink.addEventListener('click', (e) => { e.preventDefault(); toggleMenu(); setTimeout(toggleCommunityModal, 300); });
+        closeCommunityModalBtn.addEventListener('click', toggleCommunityModal);
+
+        postBtn.addEventListener('click', async () => {
+            const postText = postInput.value.trim();
+            if (postText && auth.currentUser) {
+                try {
+                    await addDoc(postsCollectionRef, {
+                        text: postText,
+                        authorId: auth.currentUser.uid,
+                        likes: 0,
+                        commentCount: 0,
+                        timestamp: serverTimestamp()
+                    });
+                    postInput.value = '';
+                } catch (e) {
+                    console.error("Error adding document: ", e);
+                }
+            }
+        });
+
+        function formatTimeAgo(timestamp) {
+            if (!timestamp) return 'Just now';
+            const now = new Date();
+            const postDate = timestamp.toDate();
+            const seconds = Math.floor((now - postDate) / 1000);
+
+            let interval = seconds / 31536000;
+            if (interval > 1) return Math.floor(interval) + " years ago";
+            interval = seconds / 2592000;
+            if (interval > 1) return Math.floor(interval) + " months ago";
+            interval = seconds / 86400;
+            if (interval > 1) return Math.floor(interval) + " days ago";
+            interval = seconds / 3600;
+            if (interval > 1) return Math.floor(interval) + " hours ago";
+            interval = seconds / 60;
+            if (interval > 1) return Math.floor(interval) + " minutes ago";
+            return "Just now";
+        }
+        
+        function setupRealtimeFeed() {
+            const q = query(postsCollectionRef, orderBy('timestamp', 'desc'));
+            onSnapshot(q, (querySnapshot) => {
+                postFeed.innerHTML = '<div class="loader mx-auto"></div>'; 
+                const posts = [];
+                querySnapshot.forEach((doc) => {
+                    posts.push({ id: doc.id, ...doc.data() });
+                });
+                
+                if(posts.length === 0){
+                   postFeed.innerHTML = '<p class="text-center text-gray-500">No posts yet. Be the first to share something!</p>';
+                   return;
+                }
+
+                postFeed.innerHTML = ''; // Clear feed
+                posts.forEach(post => {
+                    const postElement = document.createElement('div');
+                    postElement.className = 'bg-gray-800/50 p-4 rounded-lg mb-4 border border-gray-700';
+                    postElement.innerHTML = `
+                        <p class="text-gray-300 mb-2">${post.text}</p>
+                        <div class="flex items-center justify-between text-xs text-gray-500">
+                            <span>By: ${post.authorId.substring(0, 8)}...</span>
+                            <span>${formatTimeAgo(post.timestamp)}</span>
+                        </div>
+                        <div class="flex items-center gap-4 mt-3 pt-3 border-t border-gray-700">
+                             <button data-action="like" data-id="${post.id}" class="flex items-center gap-1 text-gray-400 hover:text-green-400 transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                                <span>${post.likes}</span>
+                            </button>
+                             <button data-action="comment" data-id="${post.id}" class="flex items-center gap-1 text-gray-400 hover:text-green-400 transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 5.523-4.477 10-10 10S1 17.523 1 12 5.477 2 11 2s10 4.477 10 10z"></path></svg>
+                                <span class="comment-count">${post.commentCount || 0}</span>
+                            </button>
+                            <div class="flex-grow"></div>
+                            ${post.authorId === auth.currentUser?.uid ? `<button data-action="delete" data-id="${post.id}" class="flex items-center gap-1 text-gray-400 hover:text-red-400 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>` : ''}
+                        </div>
+                        <div class="comment-section mt-3 pt-3 border-t border-gray-600" data-post-id="${post.id}"></div>
+                    `;
+                    postFeed.appendChild(postElement);
+                });
+            }, (error) => {
+                console.error("Firestore snapshot error:", error);
+                postFeed.innerHTML = `<p class="text-center text-red-400">Error loading community feed. Your Firebase security rules might be incorrect. Please ensure public access is enabled.</p>`;
+            });
+        }
+        
+        postFeed.addEventListener('click', async (e) => {
+            const button = e.target.closest('button');
+            if (!button) return;
+
+            const action = button.dataset.action;
+            const postId = button.dataset.id;
+
+            if (action === 'like') {
+                const postRef = doc(db, `artifacts/${appId}/public/data/community_posts`, postId);
+                await updateDoc(postRef, { likes: increment(1) });
+            } 
+            else if (action === 'delete') {
+                 const postRef = doc(db, `artifacts/${appId}/public/data/community_posts`, postId);
+                 await deleteDoc(postRef);
+            }
+            else if (action === 'comment') {
+                const commentSection = document.querySelector(`.comment-section[data-post-id="${postId}"]`);
+                const isVisible = commentSection.classList.contains('active');
+
+                if (isVisible) {
+                    commentSection.style.maxHeight = '0px';
+                    commentSection.classList.remove('active');
+                    commentSection.innerHTML = '';
+                } else {
+                    commentSection.classList.add('active');
+                    commentSection.style.maxHeight = '500px'; 
+                    renderComments(postId, commentSection);
+                }
+            }
+        });
+        
+        function renderComments(postId, container) {
+            container.innerHTML = `<div class="loader mx-auto my-4"></div>`;
+            const commentsRef = collection(db, `artifacts/${appId}/public/data/community_posts`, postId, 'comments');
+            const q = query(commentsRef, orderBy('timestamp', 'asc'));
+
+            onSnapshot(q, (snapshot) => {
+                container.innerHTML = `
+                    <div class="space-y-2 mb-3">
+                        <!-- comments will go here -->
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="text" class="comment-input w-full p-2 bg-gray-900 border-2 border-gray-700 rounded-lg text-sm" placeholder="Write a comment...">
+                        <button class="comment-submit-btn bg-green-700 text-white font-bold py-2 px-3 rounded-lg text-sm">Send</button>
+                    </div>`;
+                
+                const commentsList = container.querySelector('.space-y-2');
+                if (snapshot.empty) {
+                    commentsList.innerHTML = '<p class="text-xs text-gray-500 text-center">No comments yet.</p>';
+                } else {
+                    snapshot.forEach(doc => {
+                        const comment = doc.data();
+                        const commentEl = document.createElement('div');
+                        commentEl.className = 'bg-gray-700/50 p-2 rounded';
+                        commentEl.innerHTML = `
+                            <p class="text-sm text-gray-300">${comment.text}</p>
+                            <p class="text-xs text-gray-500 mt-1">By: ${comment.authorId.substring(0,8)}... - ${formatTimeAgo(comment.timestamp)}</p>`;
+                        commentsList.appendChild(commentEl);
+                    });
+                }
+
+                container.querySelector('.comment-submit-btn').addEventListener('click', async () => {
+                    const input = container.querySelector('.comment-input');
+                    const text = input.value.trim();
+                    if (text && auth.currentUser) {
+                        await addDoc(commentsRef, {
+                            text: text,
+                            authorId: auth.currentUser.uid,
+                            timestamp: serverTimestamp()
+                        });
+                        const postRef = doc(db, `artifacts/${appId}/public/data/community_posts`, postId);
+                        await updateDoc(postRef, { commentCount: increment(1) });
+                        input.value = '';
+                    }
+                });
+            });
+        }
+
+
+        // --- Rest of the UI Logic (Modals, Buttons, etc.) ---
+        const menuBtn = document.getElementById('menu-btn');
+        const closeBtn = document.getElementById('close-btn');
+        const sideMenu = document.getElementById('side-menu');
+        const menuOverlay = document.getElementById('menu-overlay');
+        const ourTeamLink = document.getElementById('our-team-link');
+        const teamModal = document.getElementById('team-modal');
+        const closeTeamModalBtn = document.getElementById('close-team-modal-btn');
+        const sourcesLink = document.getElementById('sources-link');
+        const sourcesModal = document.getElementById('sources-modal');
+        const closeSourcesModalBtn = document.getElementById('close-sources-modal-btn');
+        const browseLink = document.getElementById('browse-link');
+        const browseModal = document.getElementById('browse-modal');
+        const closeBrowseModalBtn = document.getElementById('close-browse-modal-btn');
+        const browseTimestamp = document.getElementById('browse-timestamp');
+
+        // --- Typewriter Instances ---
+        let teamTitleTyped, sourcesTitleTyped, browseTitleTyped;
+
+        // --- Menu Logic ---
+        function toggleMenu() {
+            sideMenu.classList.toggle('-translate-x-full');
+            menuOverlay.classList.toggle('hidden');
+        }
+
+        menuBtn.addEventListener('click', toggleMenu);
+        closeBtn.addEventListener('click', toggleMenu);
+        menuOverlay.addEventListener('click', toggleMenu);
+
+        // --- Team Modal Logic ---
+        function toggleTeamModal() {
+            teamModal.classList.toggle('hidden');
+            if (!teamModal.classList.contains('hidden') && !teamTitleTyped) {
+                teamTitleTyped = new TypeIt('#team-title', { strings: "Meet the Codators", speed: 50, cursor: false }).go();
+            } else if (teamTitleTyped) {
+                teamTitleTyped.reset(); teamTitleTyped = null;
+            }
+        }
+
+        ourTeamLink.addEventListener('click', (e) => { e.preventDefault(); toggleMenu(); setTimeout(toggleTeamModal, 300); });
+        closeTeamModalBtn.addEventListener('click', toggleTeamModal);
+
+        // --- Sources Modal Logic ---
+        function toggleSourcesModal() {
+            sourcesModal.classList.toggle('hidden');
+            if (!sourcesModal.classList.contains('hidden') && !sourcesTitleTyped) {
+                 sourcesTitleTyped = new TypeIt('#sources-title', { strings: "Verified Sources", speed: 50, cursor: false }).go();
+            } else if(sourcesTitleTyped) {
+                sourcesTitleTyped.reset(); sourcesTitleTyped = null;
+            }
+        }
+
+        sourcesLink.addEventListener('click', (e) => { e.preventDefault(); toggleMenu(); setTimeout(toggleSourcesModal, 300); });
+        closeSourcesModalBtn.addEventListener('click', toggleSourcesModal);
+
+        // --- Browse News Modal Logic ---
+        function toggleBrowseModal() {
+            browseModal.classList.toggle('hidden');
+            if (!browseModal.classList.contains('hidden')) {
+                const now = new Date();
+                browseTimestamp.textContent = `Live as of: ${now.toLocaleString()}`;
+                if (!browseTitleTyped) {
+                    browseTitleTyped = new TypeIt('#browse-title', { strings: "Latest News Feed", speed: 50, cursor: false }).go();
+                }
+            } else if(browseTitleTyped) {
+                browseTitleTyped.reset(); browseTitleTyped = null;
+            }
+        }
+
+        browseLink.addEventListener('click', (e) => { e.preventDefault(); toggleMenu(); setTimeout(toggleBrowseModal, 300); });
+        closeBrowseModalBtn.addEventListener('click', toggleBrowseModal);
+
+
+        // --- Background Aurora Effect ---
+        document.addEventListener('mousemove', e => {
+            document.body.style.setProperty('--x', `${e.clientX}px`);
+            document.body.style.setProperty('--y', `${e.clientY}px`);
+        });
+
+        // --- Main Fact-Checker Logic ---
+        const verifyBtn = document.getElementById('verify-btn');
+        const claimInput = document.getElementById('claim-input');
+        const resultContainer = document.getElementById('result-container');
+        
+        async function getVerdict(claim) {
+            try {
+                const response = await fetch('http://127.0.0.1:5000/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ claim: claim }),
+                });
+
+                if (!response.ok) {
+                    return { verdict: "ERROR", explanation: "Could not connect to the verification server. Please ensure the backend is running.", sources: [], confidence: "0%" };
+                }
+                return await response.json();
+
+            } catch (error) {
+                console.error("Network error:", error);
+                return { verdict: "ERROR", explanation: "A network error occurred. Could not reach the verification server.", sources: [], confidence: "0%" };
+            }
+        }
+        
+        verifyBtn.addEventListener('click', async () => {
+            const claim = claimInput.value.trim();
+            if (claim === "") {
+                 resultContainer.innerHTML = `<div class="result-card bg-red-900/50 p-4 rounded-lg border border-red-700 text-center"><p class="font-bold text-red-300">Please enter a statement to verify.</p></div>`;
+                return;
+            }
+            resultContainer.innerHTML = `<div class="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 rounded-lg"><div class="loader"></div><p class="text-green-400 text-lg title-font animate-pulse">Connecting to server & verifying...</p></div>`;
+            const result = await getVerdict(claim);
+            displayResult(result);
+        });
+
+        function displayResult(result) {
+            const verdict = result.verdict || "UNVERIFIED";
+            const explanation = result.explanation || "No explanation available.";
+            const sources = result.sources || [];
+            const confidence = result.confidence || "N/A";
+
+            let verdictColor, verdictBgColor, borderColor, soundType, iconHtml;
+
+            switch(verdict) {
+                case "TRUE":
+                    verdictColor = 'text-green-300'; verdictBgColor = 'bg-green-900/50'; borderColor = 'border-green-700';
+                    iconHtml = `<svg class="w-16 h-16 text-yellow-300 lightbulb-animation" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.311a7.5 7.5 0 01-7.5 0c-1.421-.62-2.897-1.52-4.14-2.599a7.5 7.5 0 01-2.599-4.14c-.62-1.421-1.52-2.897-2.599-4.14a7.5 7.5 0 010-7.5c.977-1.243 1.979-2.519 2.599-4.14a7.5 7.5 0 014.14-2.599c1.421-.62 2.897-1.52 4.14-2.599a7.5 7.5 0 017.5 0c1.243.977 2.519 1.979 4.14 2.599a7.5 7.5 0 012.599 4.14c.62 1.421 1.52 2.897 2.599 4.14a7.5 7.5 0 010 7.5c-.977 1.243-1.979 2.519-2.599 4.14a7.5 7.5 0 01-4.14 2.599c-1.421.62-2.897 1.52-4.14 2.599z" /></svg>`;
+                    break;
+                case "FALSE":
+                    verdictColor = 'text-red-300'; verdictBgColor = 'bg-red-900/50'; borderColor = 'border-red-700';
+                    iconHtml = `<div class="relative w-20 h-20 stamp-animation"><svg class="w-20 h-20 text-red-500" viewBox="0 0 100 100"><rect x="5" y="5" width="90" height="90" rx="10" stroke="currentColor" stroke-width="5" fill="none" /><text x="50" y="60" font-family="'Chakra Petch', sans-serif" font-size="30" fill="currentColor" text-anchor="middle" font-weight="bold">FALSE</text></svg></div>`;
+                    break;
+                case "ERROR":
+                    verdictColor = 'text-orange-300'; verdictBgColor = 'bg-orange-900/50'; borderColor = 'border-orange-700';
+                    iconHtml = `<svg class="w-16 h-16 text-orange-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>`;
+                    break;
+                default: // UNVERIFIED
+                    verdictColor = 'text-gray-300'; verdictBgColor = 'bg-gray-800/50'; borderColor = 'border-gray-700';
+                    iconHtml = `<svg class="w-16 h-16 text-gray-400 scan-animation" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>`;
+                    break;
+            }
+
+            let sourcesHtml = sources.map(source => `<a href="${source.url}" target="_blank" rel="noopener noreferrer" class="inline-block bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm hover:bg-gray-600 transition-colors">${source.title} ↗</a>`).join(' ');
+
+            resultContainer.innerHTML = `
+                <div class="result-card ${verdictBgColor} p-6 rounded-xl border ${borderColor} flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6">
+                    <div class="flex-shrink-0 w-24 h-24 flex items-center justify-center">${iconHtml}</div>
+                    <div class="flex-grow w-full">
+                        <div class="flex justify-between items-baseline">
+                             <h3 id="verdict-title" class="text-3xl font-bold ${verdictColor} mb-2 title-font"></h3>
+                             <p class="text-sm text-gray-400 title-font">Confidence: <span class="font-bold text-xl ${verdictColor}">${confidence}</span></p>
+                        </div>
+                        <p class="text-lg text-gray-300 mb-4">${explanation}</p>
+                        ${sources.length > 0 ? `<div class="border-t ${borderColor.replace('border-', 'border-t-')} opacity-50 my-3"></div><div class="flex flex-wrap gap-2"><span class="text-gray-400 font-semibold">Sources:</span> ${sourcesHtml}</div>` : ''}
+                    </div>
+                </div>
+            `;
+
+            new TypeIt('#verdict-title', { strings: verdict, speed: 75, cursor: false }).go();
+        }
+
+        // --- Initial Page Load Animations ---
+        document.addEventListener('DOMContentLoaded', () => {
+            setupAuth(); // Authenticate with Firebase on page load
+            new TypeIt('#main-title', {
+                strings: "False Fact Detector",
+                speed: 50,  
+                cursor: false,
+                afterComplete: () => {
+                    new TypeIt('#sub-title', {
+                        strings: "An AI-powered verification tool by Team Codators",
+                        speed: 30,
+                        cursor: false
+                    }).go();
+                }
+            }).go();
+        });
+
+    </script>
+</body>
+</html>
+
